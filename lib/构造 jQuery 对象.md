@@ -78,9 +78,127 @@ jQuery.fn.init.prototype = jQuery.fn;
 
 1. `selector` 可以转换为 `false`：`$("")`、`$(null)`、`$(undefined)`、`$(false)`，直接返回 `this`，即空的 jQuery 对象。
 2. `selector` 是字符串。
- 1. 
+ 1. 如果开头是 `<` 结尾是 `>` 并且长度大于等于 3，jQuery 默认它是 HTML。此时 `match = [null, selector, null]`，当然这种检验不能保证正确性，如 `<div><p>`
+ 2. 否则 `/^(?:\s*(<[\w\W]+>)[^>]*|#([\w-]*))$/` 正则来对 `selector` 进行检验。这个正则捕获两个分组，前一个分组是 `<**>` 的格式，为 HTML，第二个分组是匹配 `#id` 的格式。因此正则表达式执行 `exec` 的结果前三项就为 `selector`、HTML 捕获分组、`#id` 捕获分组。
+ 3. 如果是 HTML，`jQuery.merge(this, jQuery.parseHTML)`。
+     1. `jQuery.parseHTML` 中判断为单个标签，那么用 `docuemnt.createElement` 创建并返回。
+     2. 否则，用 `jQuery.buildFragment` 来创建返回。
+     3. `context` 是一个普通对象，那么把它当做属性数组，添加属性或事件到新建元素上。
+ 4. 如果是 `#id`，没有指定 `context`，用 `getElementById` 获取元素，设置 `this.context` 为 `document`。
+ 5. 如果 `selector` 是选择器表达式。
+     1. 如果指定了 `context`，`return this.constructor( context ).find( selector );`。
+     2. 否则，`return ( context || rootjQuery ).find( selector );`。
 3. `selector` 是 DOM 元素，设置第一个元素及 `context` 属性为该 DOM 元素，`length` 为 1。 
 4. `selector` 是函数：`return rootjQuery.ready(selector);`。
 5. `selector` 是 jQuery 对象，把 `selector`、`context` 设置给 `this`，在后面的 `return jQuery.makeArray(selector, this)` 中会把包含的元素复制到当前的 jQuery 对象中。
 6. 其它任意类型值：`return jQuery.makeArray(selector, this)`。
 
+### `jQuery.buildFragment(elems, context, scripts, selection)`
+
+复杂 HTML 创建 jQuery 对象时利用 `jQuery.buildFragment` 来将 HTML 字符串转化为 DOM，本小节的内容就是阅读这个方法是如何实现的。书上的 1.7.1 版本中描述了 `jQuery.buildFragment` 和 `jQuery.clean` 两个方法，但是在 1.10.1 中 `jQuery.buildFragment` 已经把 `jQuery.clean` 合并了进来。
+
+1. `createSafeFragment(context)` 内部调用 `document.createFragment` 创建文档片段，并创建 `nodeNames` 中包含的 HTML5 元素，这种文档片段叫做安全文档片段。IE 9 一下不支持 HTML5，但是解决这个问题有一个莫名其妙的办法，就是预先调用 `document.createElement('未知标签')`，之后浏览器就会正确解析和渲染这个标签。这也就是这里这么做的原因。
+2. 遍历等待转换的 HTML 代码数组
+ 1. 如果是对象，则直接 `merge` 进 `nodes`。
+ 2. 如果代码中不包含标签、字符代码、数字代码，那么 `document.createTextNode` 创建文本节点，插入 `nodes`。
+ 3. 否则就当做 HTML 进行处理。
+     1. 如果 `tmp` 不存在，创建一个 `div` 插入并赋值给 `tmp`。
+     2. 提取标签，然后从 `wrapMap` 中获取需要包裹的标签，这是针对 `option`、`legend` 等需要包括的元素来做的。
+     3. `tmp.innerHTML = wrap[1] + elem.replace(rxhtmlTag, "<$1></$2>") + wrap[2];` 通过 `innerHTML` 将包裹后的字符串转换成 DOM 子树。此处 `rxhtmlTag` 正则的作用是修正自关闭标签，例如 `<div/>` 会被修正为 `<div></div>`。
+     4. 上一步的 `wrap[1]` 和 `wrap[2]` 分别为包裹的父标签和闭合父标签，而 `wrap[0]` 表示的是包裹的层级，这一部做的就是从包裹的层级中取出我们正则需要的 DOM 内容。
+     5. 手动加入被 IE 6-8 剔除的前导空白文本。
+     6. 移除 IE 6/7 自动插入的空 `tbody` 标签。
+     7. 将 `tmp` 的 `childNodes` 都合并进 `nodes`。
+     8. 清除 `tmp` 的子元素。
+     9. `tmp` 指向安全文档片段的 `lastChild`。
+ 4. 在安全文档片段上清除 `tmp`。
+ 5. 修正 IE 6/7 复选框、单选框的选中状态丢失问题。
+ 6. 遍历 `nodes`，提取 `script` 存入 `scripts`，其它的插入安全文档片段。
+ 7. 最后返回安全文档片段。
+
+还是挺复杂的，这里再理一理，首先因为 `documentFragment` 不支持 `innerHTML` 因此需要创建一个临时的 `div` 来调用 `innerHTML`。这个过程中涉及了包裹，还有自闭合的处理。此后，临时的 `div` 事实上不需要了，就先剥掉这层壳，然后处理 IE 下的一些问题，最后把新建的元素添加到 `nodes`。然后才是把 `nodes` 上的元素添加到安全文档片段上返回。不过对于 `script` 是单独存到 `scripts` 变量中的。
+
+### `jQuery.extend()`、`jQuery.fn.extend()`
+
+用于合并多个对象的属性到第一个对象，类似于 es6 的 `Object.assign()`，不过还是有区别的。
+
+因为两者实际上指向的是同一个函数，此处只写 `jQuery.extend()`，但要知道的是它同时也指代 `jQuery.fn.extend()`。
+
+参数：
+
+- `deep`：可选，表示是否深度合并，默认为 `false`。
+- `target`：表示合并的目标对象。
+- `objectArr`：可选，表示源对象。
+
+1. 参数修正。
+ 1. `target` 指向 `arguments[0] || {}`。
+ 2. 如果第一个参数为布尔值，那么赋值给 `deep` 变量，此时把 `target` 指向 `arguments[1] || {}`。
+ 3. 如果此时 `target` 不是对象，则令 `target` 为 `{}`。
+ 4. 如果只有一个参数，那么会以 `this` 为目标对象。
+2. 遍历源对象。
+ 1. 遍历源对象属性。
+ 2. 为了防止死循环，如果 `target === copy` 则 `continue`。
+ 3. 如果是深度合并，那么递归调用 `jQuery.extend`。
+ 4. 否则不是深度合并并且覆盖的属性值不是 `undefined` 那么覆盖同名属性。 
+
+### 原型属性和方法
+
+- `jquery`：当前的 jQuery 版本。
+- `constructor`：构造函数，为 jQuery。
+- `init`：实际的构造方法。
+- `selector`：选择器，默认为 `""`，通过构造函数设置。
+- `length`：包含的元素个数。
+- `toArray`：调用数组原型的 `slice`，将 jQuery 对象转为数组对象。
+- `get`：如果传入了下标参数，那么返回对应的元素，小于零时会加上 `length`。否则的话返回 `toArray` 的结果，一个纯数组。
+- `pushStack`：创建一个空的 jQuery 对象，把元素都放进去，并且在 `prevObject` 保存了对当前 jQuery 对象的引用，返回新的 jQuery 对象。
+- `each`：它本质上调用的是静态方法 `jQuery.each`，所以在下面写到静态方法的地方讲。
+- `ready`：它本质上调用的是静态方法 `jQuery.ready.promise()`，所以在下面写到静态方法的地方讲。
+- `slice`：调用数组原型的 `slice` 截取了一个子集，然后传给 `pushStack` 方法，创建一个包含子集的 jQuery 对象。
+- `eq`：根据传入下标参数，创建一个下表所在元素的 jQuery 对象。
+- `first`：等价于 `eq(0)`。
+- `last`：等价于 `eq(-1)`。
+- `map`：利用静态方法 `jQuery.map` 遍历元素，执行回调，然后利用 `pushStack` 返回一个新的 jQuery 对象。 
+- `end`：返回 `prevObject`，没有则返回空的 jQuery 对象。
+- `push`：借用数组原生的 `push`。
+- `sort`：借用数组原生的 `sort`。
+- `splice`：借用数组原生的 `splice`。
+- 等等，因为还有很多原型属性和方法是通过 `extend` 方法在其它模块，而不是入口模块定义的。这部分在写其它模块时写到。
+
+要着重介绍的是 `pushStack` 和 `end`，因为正是它们为我们带来了方便的链式写法。
+
+###### `pushStack`
+
+```
+pushStack: function( elems ) {
+	// 新建一个 jQuery 对象，然后将传入的 elems 合并到它上面，放的位置是整数下标的位置
+	var ret = jQuery.merge( this.constructor(), elems );
+	// 指向链式调用的上一个 jQuery 对象
+	ret.prevObject = this;
+	ret.context = this.context;
+	return ret;
+}
+```
+
+###### `end`
+
+```
+end: function() {
+	// 如果没有 prevObject 说明在链式调用的最前端，此时返回空的 jQuery 对象；否则返回的是链式调用上一个 jQuery 对象。
+	return this.prevObject || this.constructor(null);
+}
+```
+
+每一个需要链式调用的 jQuery 方法都依赖于 `pushStack`，相当于往调用栈入栈，而 `end` 的作用则是返回上一个，相当于出栈。如此一来，我们就可以方便地进行链式调用了。例如像下面这个样子：
+
+```
+$('ul.first').find('.foo')
+	.css('background-color', red)
+end().find('.bar')
+	.css('background-color', blue)
+end();
+```
+
+### 静态属性和方法
+
+- `expando`：一个独一无二的编号，等于 `"jQuery" + ( core_version + Math.random() ).replace( /\D/g, "" )`。
+- `noConflict`：用于释放 jQuery 对全局变量 `$` 的控制权。它接受一个参数，如果为 `true` 也会释放对全局变量 `jQuery` 的控制权。
