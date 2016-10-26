@@ -145,28 +145,28 @@ jQuery.fn.init.prototype = jQuery.fn;
 
 - `jquery`：当前的 jQuery 版本。
 - `constructor`：构造函数，为 jQuery。
-- `init`：实际的构造方法。
+- `init()`：实际的构造方法。
 - `selector`：选择器，默认为 `""`，通过构造函数设置。
 - `length`：包含的元素个数。
-- `toArray`：调用数组原型的 `slice`，将 jQuery 对象转为数组对象。
-- `get`：如果传入了下标参数，那么返回对应的元素，小于零时会加上 `length`。否则的话返回 `toArray` 的结果，一个纯数组。
-- `pushStack`：创建一个空的 jQuery 对象，把元素都放进去，并且在 `prevObject` 保存了对当前 jQuery 对象的引用，返回新的 jQuery 对象。
-- `each`：它本质上调用的是静态方法 `jQuery.each`，所以在下面写到静态方法的地方讲。
-- `ready`：它本质上调用的是静态方法 `jQuery.ready.promise()`，所以在下面写到静态方法的地方讲。
-- `slice`：调用数组原型的 `slice` 截取了一个子集，然后传给 `pushStack` 方法，创建一个包含子集的 jQuery 对象。
-- `eq`：根据传入下标参数，创建一个下表所在元素的 jQuery 对象。
-- `first`：等价于 `eq(0)`。
-- `last`：等价于 `eq(-1)`。
-- `map`：利用静态方法 `jQuery.map` 遍历元素，执行回调，然后利用 `pushStack` 返回一个新的 jQuery 对象。 
-- `end`：返回 `prevObject`，没有则返回空的 jQuery 对象。
-- `push`：借用数组原生的 `push`。
-- `sort`：借用数组原生的 `sort`。
-- `splice`：借用数组原生的 `splice`。
+- `toArray()`：调用数组原型的 `slice`，将 jQuery 对象转为数组对象。
+- `get()`：如果传入了下标参数，那么返回对应的元素，小于零时会加上 `length`。否则的话返回 `toArray` 的结果，一个纯数组。
+- `pushStack()`：创建一个空的 jQuery 对象，把元素都放进去，并且在 `prevObject` 保存了对当前 jQuery 对象的引用，返回新的 jQuery 对象。
+- `each()`：它本质上调用的是静态方法 `jQuery.each`，所以在下面写到静态方法的地方讲。
+- `ready()`：它本质上调用的是静态方法 `jQuery.ready.promise()`，所以在下面写到静态方法的地方讲。
+- `slice()`：调用数组原型的 `slice` 截取了一个子集，然后传给 `pushStack` 方法，创建一个包含子集的 jQuery 对象。
+- `eq()`：根据传入下标参数，创建一个下表所在元素的 jQuery 对象。
+- `first()`：等价于 `eq(0)`。
+- `last()`：等价于 `eq(-1)`。
+- `map()`：利用静态方法 `jQuery.map` 遍历元素，执行回调，然后利用 `pushStack` 返回一个新的 jQuery 对象。 
+- `end()`：返回 `prevObject`，没有则返回空的 jQuery 对象。
+- `push()`：借用数组原生的 `push`。
+- `sort()`：借用数组原生的 `sort`。
+- `splice()`：借用数组原生的 `splice`。
 - 等等，因为还有很多原型属性和方法是通过 `extend` 方法在其它模块，而不是入口模块定义的。这部分在写其它模块时写到。
 
-要着重介绍的是 `pushStack` 和 `end`，因为正是它们为我们带来了方便的链式写法。
+要着重介绍的是 `pushStack()` 和 `end()`，因为正是它们为我们带来了方便的链式写法。
 
-###### `pushStack`
+###### `pushStack()`
 
 ```
 pushStack: function( elems ) {
@@ -179,7 +179,7 @@ pushStack: function( elems ) {
 }
 ```
 
-###### `end`
+###### `end()`
 
 ```
 end: function() {
@@ -201,4 +201,33 @@ end();
 ### 静态属性和方法
 
 - `expando`：一个独一无二的编号，等于 `"jQuery" + ( core_version + Math.random() ).replace( /\D/g, "" )`。
-- `noConflict`：用于释放 jQuery 对全局变量 `$` 的控制权。它接受一个参数，如果为 `true` 也会释放对全局变量 `jQuery` 的控制权。
+- `noConflict()`：用于释放 jQuery 对全局变量 `$` 的控制权。它接受一个参数，如果为 `true` 也会释放对全局变量 `jQuery` 的控制权。如果第三方库也需要全局 `$` 变量，那么可以使用 `$.noConflict()` 来释放全局的 `$`，至于引入多个 jQuery 而要释放全局 jQuery 的情况，还是不讨论了，感觉有点傻。
+- `isReady`、`readyWait`、`holdReady()`、`ready()` 用于支持 `ready` 事件在第九章事件中讲。
+- 类型检测
+ - `class2type`：这个不是静态属性，但是在类型检测中用到。它是如下结构：`{ "[object Array]":"array","[object Boolean]":"boolean"... }`，包括了所有的原生对象。
+ - `type()`：如果是 `undefined` 或 `null` 则返回 `"undefined"` 或 `"null"`，如果是原生对象，则返回 `class2type[Object.prototype.toString.call(obj)]`，不是原生对象返回 `object`，如果不是对象或者函数，则返回 `typeof obj`。这里的知识点是，`Object.prototype.toString.call` 用来判断对象的类型，利用内部属性 [[Class]]，原始值则用 `typeof` 来判断。
+ - `isFunction()`：调用 `jQuery.type(obj) === "function";` 进行判断。
+ - `isArray()`：如果支持 `Array.isArray` 则用这个方法，否则使用 `jQuery.type(obj) === "array";`。
+ - `isWindow()`：利用了 `window.window == window`。`obj != null && obj == obj.window;`。
+ - `isNumeric()`：这个方法等同于 underscore 里的 `isFinite`，`isFinite(obj) && !isNaN(parseFloat(obj));`。
+ - `isPlainObject()`：判断是否是 `{}` 或 `new Object()` 直接创建的对象。
+  - 如果 `obj` 可以转换为 `false` 或 `Object.prototype.toString.call(obj)` 不是 `[object Object]` 或 obj 是 DOM 或 Window，这四种情况可以直接返回 `false`。
+  - 如果 `obj` 有 `constructor` 并且是继承而来的，但是构造函数的原型上没有 `isPrototypeOf` 说明它不是由 `Object` 创建的。
+  - IE 8/9 会抛出异常，捕获并返回 `false`。
+  - `{}` 或 `new Object()` 直接创建的对象是没有可遍历的继承属性的，因此 `for...in` 遍历，如果有继承属性，那么返回 `false`。
+ - `isEmptyObject()`：`for...in` 遍历属性，如果有则返回 `false`。
+- `parseHTML()`：在构造函数中讲过了，用来解析 HTML 返回节点数组。
+- `parseJSON`：如果支持 `JSON.parse` 则直接使用，对于 IE 8 一下不支持 `JSON` 对象的情况，jQuery 为我们进行了兼容。利用的不是 `eval`，而是 `new Function("return"+data)`。不过在使用前，需要将字符串取出前后空格，并用正则表达式进行检查合法性。如果不合法，会抛出一个错误。
+- `parseXML()`：IE 使用 `new ActiveXObject("Microsoft.XMLDOM")` 来解析，其他浏览器使用标准的 `new DOMParser();`。这里还有非法性的处理，可以看源码。
+- `globalEval`：在全局环境之下代码，如果支持 `window.execScript` 则使用，否则在匿名函数中使用 `eval`。`window[ "eval" ].call( window, data );`。不过个人觉得 `(0, eval)(data);` 这种方式更简洁，就不需要匿名函数了。
+- `camelCase()`：把连字符转换为驼峰式，如 `background-color` 转为 `backgroundColor`。
+- `nodeName()`：检查加点名称与指定值是否相等。
+- `trim()`：如果浏览器支持 es5 的 `String.prototype.trim()` 则直接使用，否则使用正则表达式替换前后的空位。对于 `null` 和 `undefined` 返回空字符串。
+- 数组操作
+- `guid`：全局计数器，用于事件模块和缓存模块。
+- `proxy()`：
+- `access()`：
+- `error()`：抛出一个错误。
+- `noop`：一个空函数。 
+- `now()`：返回当前时间。
+- `swap()`：
