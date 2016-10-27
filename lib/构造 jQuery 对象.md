@@ -259,7 +259,7 @@ function isArraylike( obj ) {
 	var length = obj.length,
 		type = jQuery.type( obj );
 	
-	// window 对象返回 false
+	// window.length = 0
  	if ( jQuery.isWindow( obj ) ) {
 		return false;
 	}

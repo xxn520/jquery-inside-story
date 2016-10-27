@@ -9,11 +9,11 @@
 1. [总体架构](./lib/总体架构.md)
 2. [构造 jQuery 对象](./lib/构造 jQuery 对象.md)
 3. 底层支持模块
-   1. 选择器 Sizzle
+   1. [选择器 Sizzle](./lib/选择器 Sizzle.md)
    2. 异步队列 Deferred Object
    3. 数据缓存 Data
    4. 队列 Queue
-   5. 浏览器功能测试
+   5. [浏览器功能测试](./lib/浏览器功能测试.md)
 4. 功能模块
    1. 属性操作
    2. 事件系统
