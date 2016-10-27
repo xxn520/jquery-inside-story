@@ -224,10 +224,55 @@ end();
 - `nodeName()`：检查加点名称与指定值是否相等。
 - `trim()`：如果浏览器支持 es5 的 `String.prototype.trim()` 则直接使用，否则使用正则表达式替换前后的空位。对于 `null` 和 `undefined` 返回空字符串。
 - 数组操作
+ - `each()`：前面的 `jQuery.prototype` 或者说 `jQuery.fn` 中的 `each()` 调用的就是这个通用的迭代方法。对于数组或有 `length` 属性的对象，它通过下标遍历，其他对象使用 `for...in` 遍历。回调函数中返回 `false` 终止遍历。在使用 `jQuery.fn.each()` 它返回的是当前对象，因此可以支持链式调用。
+ - `map()`：对于数组或有 `length` 属性的对象遍历下标、对于对象则用 `for...in`，它与 `each()` 的区别在于，调用回调后，会把返回值存入一个结果数组，最后返回的也是结果数组。
+ - `makeArray()`：如果第一个参数是类数组对象，则使用 `jQuery.merge`，否则直接把第一个参数 `push` 到数组中。这里的数组可以是第二个传入的参数，否则为 `[]`。
+ - `inArray()`：支持 `indexOf()` 就用这个，否则遍历查找，第三个可选参数表示从哪里开始找。这里还有个小技巧是 `!!~jQuery.inArray` 来判断是否在，`~` 相当于改变符号并减一，再利用 `!` 转换为布尔值，比起比较来看，好像也差不多...不过逼格高一点。
+ - `merge()`：用于把第二个数组合并到第一个数组上，如果第二个没有 `length` 属性，此时的策略的复制连续的整数下标属性到第一个上面。
+ - `grep()`：过滤数组，如果回调的返回值转换为布尔类型的结果等于不第三个参数转换为布尔类型的结果，那么加入过滤数组，第三个参数默认为 `false`。最后返回过滤数组。
 - `guid`：全局计数器，用于事件模块和缓存模块。
 - `proxy()`：
-- `access()`：
+ - `proxy(fn, context)`：设置 `fn` 的 `this` 为 `context`。
+ - `proxy(context, name)`：`name` 是 `context` 的属性，`name` 所对应函数的 `this` 始终为 `context`。
+- `access(elems, fn, key, value, chainable, emptyGet, raw)`：
+ - 参数好多啊，为集合中的元素设置一个或多个值，或读取第一个元素的属性值。
+ - 如果 `key` 是对象，那么遍历 `key`，递归调用自身。
+ - 否则如果 `value` 则设置单个属性。
+ - 如果 `value` 不是函数，直接调用回调函数。
+ - 否则执行完函数后，把结果作为参数调用回调函数。
+ - 还需要研究。
 - `error()`：抛出一个错误。
 - `noop`：一个空函数。 
 - `now()`：返回当前时间。
-- `swap()`：
+- `swap()`：把第二个参数上的属性设置到第一个元素的 `style` 上，然后执行回调，并恢复为原来状态，不过暂时不知道具体有何用。
+
+### 其它
+
+到这里入口模块基本已经过了一遍，整体还是比较清晰的。剩下还有一点点要补充的。
+
+###### isArraylike
+
+比起我平时只判断的 `length`，jQuery 做了跟多细节上的处理。
+
+```
+function isArraylike( obj ) {
+	var length = obj.length,
+		type = jQuery.type( obj );
+	
+	// window 对象返回 false
+ 	if ( jQuery.isWindow( obj ) ) {
+		return false;
+	}
+
+	// DOM 元素且有 length 返回 true
+	if ( obj.nodeType === 1 && length ) {
+		return true;
+	}
+	
+	// 如果是数组，但不是函数（因为函数也有 length 属性）
+	// 或 length 为 0、length 大于 0 时需要有整数属性， length - 1。 
+	return type === "array" || type !== "function" &&
+		( length === 0 ||
+		typeof length === "number" && length > 0 && ( length - 1 ) in obj );
+}
+```
