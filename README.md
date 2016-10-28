@@ -10,7 +10,7 @@
 2. [构造 jQuery 对象](./lib/构造 jQuery 对象.md)
 3. 底层支持模块
    1. [选择器 Sizzle](./lib/选择器 Sizzle.md)
-   2. 异步队列 Deferred Object
+   2. 异步队列 Deferred Object（Promise、Generator、Async 都研究过了，这个就不看了）
    3. 数据缓存 Data
    4. 队列 Queue
    5. [浏览器功能测试](./lib/浏览器功能测试.md)
