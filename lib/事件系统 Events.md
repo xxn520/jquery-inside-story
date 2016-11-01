@@ -303,4 +303,75 @@ if ( !special.setup || special.setup.call( elem, data, namespaces, eventHandle )
 
 *需要修正的方法：*
 
+- `load`
+ - `noBubble`：`load` 本身是不冒泡的，但是在手动触发事件时，会模拟构造一条冒泡路径，导致路径上的 `load` 再次触发，这不合理，因此在构造冒泡路径前会判断这个值，为 `true` 则不会构造冒泡路径。
+- `focus`、`blur`
+ - `delegateType`：表示在为不冒泡的 `focus`、`blur` 应用事件代理时，把事件类型修正为冒泡的 `focusin` 和 `focusout`。
+ - `trigger`：优先调用原生的 `focus()` 和 `blur()` 来触发事件，此时返回 `false`，这样手动的事件触发就不会再进行下去。IE 9 以下会抛出异常，所以要捕获异常。
+- `beforeupload`：这个事件会在页面刷新或关闭前被触发，如果对应的监听函数返回一个空字符串那么会弹出确认对话框，让用户选择离开还是继续留在页面。但是这个事件使用 `addEventListener/attachEvent` 绑定，在 IE 9 以下以及 FireFox 下不会被触发，因此需要通过直接赋值或行内来修正。
+ - `setup`：如果 `this` 是 `window`，则进行绑定。
+ - `teardown`：从 `this` 上移除。
+- `mouseenter`、`mouseleave`：不支持冒泡，属于 DOM Level 3，早期的 Chrome、FireFox 支持都较差。而 `mouseover`、`mouseout` 支持冒泡，属于 DOM Level 2，基本都支持。`mouseover`、`mouseout` 的冒泡特性很多时候会造成问题，因此在除了事件代理使用 `mouseenter`、`mouseleave` 更好。不过 jQuery 帮我们进行了修正，我们最后都用的是`mouseover`、`mouseout`。
+ - `bindType`、`delegateType`：jQuery 把普通事件和代理事件都修正为 `mouseover`、`mouseout`。
+ - `handle(event)`：父元素进入子元素时，过滤掉父元素的 `mouseout` 事件和子元素冒泡到父元素的 `mouseover` 事件。子元素进入父元素时，过滤掉父元素的 `mouseover` 事件和子元素冒泡到父元素的 `mouseout` 事件。
+- `submit`：还是 IE 9 以下不支持冒泡。
+ - `setup`：监听和模拟 `submit` 事件。
+ - `postDispatch`：模拟冒泡。
+ - `teardown`：移除为了模拟冒泡而绑定的辅助事件。
+- `change`：IE 9 以下，`change` 不支持冒泡，为了支持事件代理，模拟了冒泡，事件在命名空间 `_change` 下。
+ - `setup`：对于 `radio`、`checkbox`，通过 `propertychange`、`change` 来监听和触发 `change` 事件，用 `simulate` 模拟冒泡。代理元素使用 `beforeactivate` 事来监听可能会改变选中状态的操作，用 `simulate` 模拟冒泡。
+ - `handle`：不是模拟事件、未被手动触发、不是复选框和单选框，则执行监听函数。
+ - `teardown`：移除命名空间 `_change` 下的监听函数。
+- `focusin`、`focusout`：非 IE 浏览器，不支持这两个事件的冒泡。
+
 ###### `jQuery.event.simulate`
+
+1. 如果参数 `bubble` 为 `true`，则手动触发事件，模拟冒泡。
+2. 否则在当前元素上分发和执行事件。
+3. 如果某个函数阻止了默认行为，同步为原生事件阻止默认行为。
+
+### 便捷调用
+
+如果提供了绑定函数，则用 `.on` 进行绑定，否则用 `.trigger` 触发该事件。
+
+```
+jQuery.each( ("blur focus focusin focusout load resize scroll unload click dblclick " +
+	"mousedown mouseup mousemove mouseover mouseout mouseenter mouseleave " +
+	"change select submit keydown keypress keyup error contextmenu").split(" "), function( i, name ) {
+
+	// Handle event binding
+	jQuery.fn[ name ] = function( data, fn ) {
+		return arguments.length > 0 ?
+			this.on( name, null, data, fn ) :
+			this.trigger( name );
+	};
+});
+```
+
+### 其它
+
+```
+jQuery.fn.extend({
+	// 组合方法，可传入一个或两个参数。
+	hover: function( fnOver, fnOut ) {
+		return this.mouseenter( fnOver ).mouseleave( fnOut || fnOver );
+	},
+	// 普通事件绑定
+	bind: function( types, data, fn ) {
+		return this.on( types, null, data, fn );
+	},
+	// 移除普通事件
+	unbind: function( types, fn ) {
+		return this.off( types, null, fn );
+	},
+	// 代理事件绑定
+	delegate: function( selector, types, data, fn ) {
+		return this.on( types, selector, data, fn );
+	},
+	// 移除代理事件
+	undelegate: function( selector, types, fn ) {
+		// ( namespace ) or ( selector, types [, fn] )
+		return arguments.length === 1 ? this.off( selector, "**" ) : this.off( types, selector || "**", fn );
+	}
+});
+```
