@@ -31,7 +31,7 @@ jQuery 并没有将事件监听函数直接绑定到 DOM 元素上，而是基�
 
 ###### `.on(events[,selector][,data],handler(eventObject))` 执行过程
 
-1. 监听函数被封装成 `handleObj` 对象，并插入所关联的对象数据 `handles` 中。
+1. 监听函数被封装成 `handleObj` 对象，并插入所关联的对象数据 `handlers` 中。
 2. 如果未绑定过事件，先初始化事件缓存对象为空对象，并为当前元素初始化一个主监听函数。
 3. 如果是第一次在元素上绑定某个类型的事件，先把对应的监听对象数组初始化为空数组，并在匹配元素上绑定主监听函数。
 4. 底层使用了 `jQuery.event.add`。
@@ -240,4 +240,67 @@ if ( !special.setup || special.setup.call( elem, data, namespaces, eventHandle )
  1. `handlers`：当前事件类型的缓存监听数组。
  2. `args`：转化为数组的参数。
  3. `special`：事件修正对象。
- 4. `handlerQueue`：事件队列。 
+ 4. `handlerQueue`：待执行队列，包含了后代元素匹配的代理监听对象数组以及当前元素绑定的普通监听对象数组。
+3. `event.delegateTarget = this;` 这个属性会在 `.off` 中用到。
+4. 优先调用修正方法 `special.preDispatch`，如果返回 `false` 那么直接返回。（不过搜了一下代码中，没有地方设置了 `special.preDispatch`，应该用不到）
+5. 调用 `jQuery.event.handlers` 获取待执行队列 `handlerQueue`。
+ 1. 遍历事件触发元素到代理元素的的节点。（因为触发元素可能没有绑定事件或者没有阻止冒泡，那么冒泡到代理元素来执行）
+ 2. 读取事件缓存数组，将其选择器与触发元素对比，匹配的话那么加入匹配数组。
+ 3. 最后如果匹配数组不为空，那么将匹配数组添加到 `handlerQueue`。
+ 4. 构造完成 `handlerQueue`，并返回。
+6. 提出当前元素上的普通监听对象，添加到 `handlerQueue` 中。
+7. 如果当前事件冒泡没有被停止，逐个取出 `handlerQueue` 中的内容。
+8. 遍历取出的内容中的 `handlers` 再次遍历并判断命名空间后执行，如果某个函数调用了 `stopImmediatePropagationStopped` 方法，那么两层循环都停止执行。
+9. 如果监听对象返回了 `false`，那么调用 `preventDefault` 和 `stopPropagation`。
+10. 如果有调用修正的 `special.postDispatch`。
+11. 返回最后一个有返回值的事件监听函数的返回值。
+
+### 手动触发事件
+
+###### `jQuery.fn.trigger(type,data)`、``jQuery.fn.triggerHandler(type,data)`
+
+前者用于触发每个匹配元素上绑定的监听函数和默认行为，后者只触发第一个匹配元素上的绑定函数，默认行为不触发。两个方法底层都调用了 `jQuery.event.trigger` 方法。
+
+###### `jQuery.event.trigger(event,data,elem,onlyHandlers)`
+
+*参数：*
+
+- `event`：待触发的事件，可以是事件类型、自定义事件对象或 jQuery 事件对象。
+- `data`：传给主监听函数的数据。
+- `elem`：将在该元素上手动触发事件和默认行为。
+- `onlyHandlers`：是否只执行监听函数，不触发默认行为。
+
+*执行过程：*
+
+1. 过滤文本和注释节点。
+2. 过滤掉 `focusin`、`focusout` 事件，在后面统一进行处理，因为 IE 以外对这两个事件不友好。
+3. 构造 `ontype`，用于调用行内监听函数。对于 `type` 中带有冒号的情况，jQuery 1.6 开始不会再调用行内监听函数，因此设为空字符串。 
+4. 解析命名空间。
+5. 创建 jQuery 事件对象，并修正属性。
+6. 将 `event` 和 `data` 封装为数组。
+7. 调用 修正方法 `special.trigger`，执行一些特殊的行为。
+8. 构造冒泡路径。
+9. 触发冒泡路径上元素的主监听函数和行内监听函数。
+10. 触发默认行为。
+11. 返回最后一个有返回值的监听函数的返回值。
+
+### 事件修正和模拟
+
+###### `jQuery.event.special`
+
+*修正属性和方法：*
+
+- `noBubble`：指示当前事件类型不支持或不允许冒泡。
+- `bindType`：指示绑定普通事件时使用的事件类型。
+- `delegateType`：指示绑定代理事件时使用的事件类型。
+- `setup(data,namespaces,eventHandle)`：特殊的主函数绑定行为，或者必须的初始化工作，返回 `false` 则调用原生的绑定。
+- `teardown(namespaces)`：用于执行特殊的主监听函数移除行为，在当前类型的事件全部被移除后调用。如果返回 `false`，则调用原生的移除方法。
+- `handle(event,data)`：特殊事件的响应行为，事件触发时被调用。（`dispatch` 中调用）
+- `add(handleObj)`：特殊的事件绑定行为，调用后继续正常的绑定行为。
+- `remove(handleObj)`：特殊的事件移除行为，调用该方法前，事件已经被移除。
+- `trigger(data)`：特殊事件的响应行为，事件触发时被调用。（手动触发的时候调用）
+- `_default(data)`：特殊的默认行为，返回 `false` 则调用浏览器的默认行为。
+
+*需要修正的方法：*
+
+###### `jQuery.event.simulate`
