@@ -18,8 +18,9 @@
 4. 功能模块
    1. [属性操作](./lib/属性操作.md)
    2. [事件系统](./lib/事件系统 Events.md)
-   3. DOM 遍历
-   4. DOM 操作
-   5. 样式操作
-   6. 异步请求 Ajax
-   7. 动画 Effects
+   3. [番外：ready 事件](./lib/ready 事件.md)
+   4. DOM 遍历
+   5. DOM 操作
+   6. 样式操作
+   7. 异步请求 Ajax
+   8. 动画 Effects
