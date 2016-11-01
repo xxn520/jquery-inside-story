@@ -116,7 +116,7 @@ keyHooks: {
 
 这个比较长，不贴代码了。
 
-专属属性：
+*专属属性：*
 
 - `button`：当事件触发时，那个鼠标按键被按下了。DOM Level 2 规定左中右分别为 0、1、2。但是 IE 9 以下不同，左中右分别为 1、2、4。
 - `buttons`：DOM Level 3 提供了更多的按键的支持，默认 0、左中右不变。但是支持如 5 个键的鼠标 1、2、4、8、16。
@@ -126,11 +126,118 @@ keyHooks: {
 - `screenX`、`screenY`：相对于显示器左上角的坐标，基本都支持。
 - `fromElement`、`toElement`：前者表示 `mouseover` 中离开的文档元素，后者表示 `mouseout` 中进入的文档元素，没有被标准化，等价于 DOM Level 2 和 3 中的 `relatedTarget`，IE 9 以下仅支持这两个，不支持 `relatedTarget`。
 
-修正方法：
+*修正方法：*
 
 1. 针对 `offsetX`、`offsetY`，jQuery 手动计算。
 2. 针对 `relatedTarget`，使用 `fromElement` 和 `toElement` 修正。
 3. 针对 `which`，IE 9 以下，`which` 不存在。则用 `button` 来修正。左中右分别修正为 1、2、3，默认 0。
 
+### 绑定事件
 
+###### `jQuery.fn.on(types[,selector][,data],fn[,/*INTERNAL*/ one])`
 
+用于为每个匹配元素绑定一个或多个类型的事件监听函数。底层使用了 `jQuery.event.add(elem,types,handler,data,selector)` 来实现，而其他的事件绑定方法都通过调用该方法来实现。
+
+*参数：*
+
+- `types`：事件类型字符串。
+ - 多个事件用空格分隔。
+ - 命名空间用 `.` 分隔。
+ - 还可以是一个 JavaScript 对象，属性是事件类型字符串，值是事件监听函数。
+- `selector`：可选的选择器表达式，用于绑定代理事件。事件代理利用的是冒泡机制，由父级来管理子级的事件监听，从而减少绑定的事件数量。
+ - 对于普通事件：当直接在匹配元素上触发事件或子级冒泡上来，监听函数被执行。
+ - 对于代理事件：直接在代理元素上触发事件，监听函数不执行，只有当事件从子级冒泡上来，才会用 `selector` 匹配子级，然后在匹配成功的子级元素上执行监听函数。
+- `data`：传递给监听函数的自定义数据，可以是任何类型。如果是字符串，那么 `selector` 必须为 `null`，不然可能会造成混淆。该参数会被附加到事件监听对象的 `data` 属性上，当事件被触发时会被设置到 jQuery 事件对象的 `data` 属性上。
+- `fn`：待绑定的监听函数。这个函数还可以是 `false`，这样会在后面被修正为始终返回 `false` 的函数。
+- `one`：内部使用，在 `jQuery.fn.one` 方法绑定监听函数时，会传入 1，后面的代码会把监听函数重新封装为只执行一次的新监听函数。
+
+*执行过程：*
+
+1. 当 `types` 是一个对象。
+ 1. 修正参数，以 `.on(types, selector, data)` 或 `.on(types, data)` 两种方式。
+ 2. 遍历对象，递归调用 `this.on( type, selector, data, types[ type ], one );`，调用完直接返回 `this`。 
+2. 修正参数。
+ 1. 如果 `fn` 和 `data` 都是 `null` 或 `undefined`，那么调用方式是 `.on(types, fn)`，把 `selector` 给 `fn`。
+ 2. 如果 `fn` 是 `null` 或 `undefined`，并且 `selector` 是字符串，那么调用方式是 `.on(types, selector, fn)`，把 `data` 给 `fn`。
+ 3. 如果 `fn` 是 `null` 或 `undefined`，并且 `selector` 不是字符串，那么调用方式是 `.on(types, data, fn)`，把 `data` 给 `fn`，`selector` 给 `data`。
+ 4. 如果 `fn` 是布尔值 `false`，那么把它修正为始终返回 `false` 的函数。
+3. 如果 `one` 等于 1，那么封装传入的监听函数，在调用原函数前解除事件绑定，达到执行一次的目的。把新旧两个监听函数的 `guid` 设置为相同。
+4. 最后遍历匹配元素调用 `jQuery.event.add(this,types,fn,data,selector)` 完成事件绑定。
+
+###### `jQuery.event.add(elem,types,handler,data,selector)`
+
+这个方法为事件绑定提供了底层的支持，参数根据上面方法应该能知道，不重复写一遍，直接写执行过程。
+
+1. `elemData = jQuery._data( elem );`，`elemData` 是缓存数据对象，单参数调用这个方法如果没有缓存数据对象则会初始化一个空对象。
+2. 如果 `elemData` 为 `undefined`，说明该元素无法扩展属性，那么直接返回。在 1.7.1 中还派出了文本节点和元素节点。
+3. `handler` 是自定义监听对象的情况处理，暂时还不清楚有啥用。
+4. 为监听函数分配一个唯一的 `guid`。
+5. 取出或初始化事件缓存对象 `events`。
+6. 取出或初始化主监听函数。
+7. 将 `types` 转为数组，并进行遍历。
+ 1. 取出 `namespaces` 和 `type`。
+ 2. 根据事件类型，从 `jQuery.event.special` 获取事件修正对象。关于修正对象下文介绍。
+ 3. 封装监听函数的监听对象。
+ 4. 初始化监听对象数组，绑定主监听函数。对于一些特殊事件，会优先调用修正的 `setup` 方法，返回 `false` 时才会调用 `addEventListener\attachEvent` 绑定主监听函数。而在主监听函数内，会调用 `jQuery.event.dispatch` 来触发事件。
+ 5. 将监听对象插入监听对象数组。修正对象有 `add` 方法，则需要优先调用。
+ 6. 记录绑定过的事件类型。
+8. 解除 `elem` 对 DOM 的引用，避免内存泄漏。
+
+### 移除事件
+
+###### `jQuery.fn.off(types,selector,fn)`
+
+移除匹配元素集合中每个元素上的一个或多个监听函数。参数含义类似 `on`，不介绍了，直接看执行过程吧。
+
+1. 如果 `types` 是一个被分发的 jQuery 事件对象，那么递归调用 `.off` 移除当前正在执行的事件。
+2. 如果 `types` 是一个对象，那么遍历移除对象上的属性，类似于 `.on` 方法。
+3. 修正参数，支持 `.off(fn)` 的调用，当 `fn` 是 `false` 时，修正为始终返回 `false` 的函数。
+4. 遍历匹配元素，调用 `jQuery.event.remove( this, types, fn, selector );` 移除监听函数。
+
+###### `jQuery.event.remove(elem,type,handler,selector,mappedTypes)`
+
+1. 如果该元素没有事件缓存对象，直接返回。
+2. 将 `types` 转为数组，并进行遍历。
+ 1. 取出 `namespaces` 和 `type`。
+ 2. 如果没有指定事件类型，则移除所有事件或者命名空间下的所有事件。 
+ 3. 根据事件类型，从 `jQuery.event.special` 获取事件修正对象。
+ 4. 获取事件对象数组。
+ 5. 从监听对象数组中移除匹配的监听对象。
+ 6. 如果监听对象数组为空，则移除该事件类型的主监听函数，优先调用修正对象上的 `teardown` 方法，否则才调用 `removeEventListener/detachEvent`。删除 `events[ type ]`。
+3. 如果事件缓存对象为空，移除 `handle` 和 `events` 属性。 
+
+### 事件响应
+
+前面讲到了真正绑定到元素上的只有一个主监听函数，它负责分发事件和执行监听函数。在 `jQuery.fn.on` 方法中我们进行主监听函数的创建和绑定：
+
+```
+// 创建
+if ( !(eventHandle = elemData.handle) ) {
+	eventHandle = elemData.handle = function( e ) {
+		return typeof jQuery !== core_strundefined && (!e || jQuery.event.triggered !== e.type) ?
+			jQuery.event.dispatch.apply( eventHandle.elem, arguments ) :
+			undefined;
+	};
+	eventHandle.elem = elem;
+}
+// 绑定
+if ( !special.setup || special.setup.call( elem, data, namespaces, eventHandle ) === false ) {
+	if ( elem.addEventListener ) {
+		elem.addEventListener( type, eventHandle, false );
+
+	} else if ( elem.attachEvent ) {
+		elem.attachEvent( "on" + type, eventHandle );
+	}
+}
+```
+
+###### `jQuery.event.dispatch(event)`
+
+从创建主监听函数的代码中我们可以看到底层调用了 `jQuery.event.dispatch` 来分发和执行监听函数。
+
+1. 对于传入的事件对象使用 `jQuery.event.fix` 封装为 jQuery 事件对象。IE 9 以下不会传递事件对象，此时需要通过 `window.event` 来获取。
+2. 局部变量定义与初始化。
+ 1. `handlers`：当前事件类型的缓存监听数组。
+ 2. `args`：转化为数组的参数。
+ 3. `special`：事件修正对象。
+ 4. `handlerQueue`：事件队列。 
