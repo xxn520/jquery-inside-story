@@ -10,3 +10,4 @@ index.html
 #
 lib/event.js
 lib/traversing.js
+lib/manipulation.js

@@ -20,7 +20,7 @@
    2. [事件系统](./lib/事件系统 Events.md)
    3. [番外：ready 事件](./lib/ready 事件.md)
    4. [DOM 遍历](./lib/DOM 遍历.md)
-   5. DOM 操作
+   5. [DOM 操作](./lib/DOM 操作.md)
    6. 样式操作
    7. 异步请求 Ajax
    8. 动画 Effects
