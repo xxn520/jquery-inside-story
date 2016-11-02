@@ -188,3 +188,48 @@ contents: function( elem ) {
 ```
 
 ### 模板方法
+
+```
+jQuery.each({
+	// 遍历将其使用模板方法进行封装
+	parent: function( elem ) {//...},
+	parents: function( elem ) {//...},
+	parentsUntil: function( elem, i, until ) {//...},
+	next: function( elem ) {//...},
+	prev: function( elem ) {//...},
+	nextAll: function( elem ) {//...},
+	prevAll: function( elem ) {//...},
+	nextUntil: function( elem, i, until ) {//...},
+	prevUntil: function( elem, i, until ) {//...},
+	siblings: function( elem ) {//...},
+	children: function( elem ) {//...},
+	contents: function( elem ) {//...}
+}, function( name, fn ) {
+	// 利用闭包持有 name、fn
+	// 为 jQuery 实例绑定遍历相关方法
+	jQuery.fn[ name ] = function( until, selector ) {
+		// 所有匹配元素执行 fn
+		var ret = jQuery.map( this, fn, until );
+		// 如果不以 Until，那么修正 selector 参数为 until
+		if ( name.slice( -5 ) !== "Until" ) {
+			selector = until;
+		}
+		// 如果存在 selector 并为字符串，那么进行过滤，使用到了上面的 jQuery.filter 方法
+		if ( selector && typeof selector === "string" ) {
+			ret = jQuery.filter( selector, ret );
+		}
+		if ( this.length > 1 ) {
+			// 去掉重复
+			if ( !guaranteedUnique[ name ] ) {
+				ret = jQuery.unique( ret );
+			}
+			// 对于 parent* 和 prev* 得到的结果重新排序
+			if ( rparentsprev.test( name ) ) {
+				ret = ret.reverse();
+			}
+		}
+		// 将结果封装为 jQuery 对象并返回
+		return this.pushStack( ret );
+	};
+});
+```
