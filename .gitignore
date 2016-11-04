@@ -13,3 +13,4 @@ lib/traversing.js
 lib/manipulation.js
 lib/style.js
 lib/offset.js
+lib/ajax.js

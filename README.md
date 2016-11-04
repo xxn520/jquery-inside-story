@@ -22,5 +22,5 @@
    4. [DOM 遍历](./lib/DOM 遍历.md)
    5. [DOM 操作](./lib/DOM 操作.md)
    6. [样式操作](./lib/样式操作.md)
-   7. 异步请求 Ajax
+   7. [异步请求 Ajax](./lib/异步请求 Ajax.md)
    8. 动画 Effects
