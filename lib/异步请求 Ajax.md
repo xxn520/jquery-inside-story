@@ -118,7 +118,9 @@ jQuery.ajaxSetup({
 })
 ```
 
-###### jsonp 的默认设置
+###### `jsonp` 的默认设置
+
+`jsonp` 默认的回调函数参数及回调函数名。
 
 ```
 jQuery.ajaxSetup({
@@ -193,21 +195,60 @@ serialize: function() {
 3. 如果当前是在应用前置过滤器，且返回的是 `字符串`，那么递归调用。返回的是 `undefined`。
 4. 如果当前是在应用请求发送器，返回的是请求发送器。
 
-### 工具方法
+### 内置前置过滤器
 
-###### `ajaxHandleResponses`
+###### `json`、`jsonp`
 
-1. 删除掉通配 `dataType`，得到之前覆盖的的 `Content-Type` 或返回的 `Content-Type`。
-2. 检查是否能处理，能处理并且匹配上一步求出的 `Content-Type` 那么将其推入 `dataTypes`。
-3. 如果 `dataTypes` 是我们想要的，也就是 text、xml、json。那么就确定是它了。
-4. 尝试转换成我们要的 `dataType`，如果 `dataTypes[0]` 不存在，则直接用 `type` 作为最终 `dataType`。
-5. 否则，看看能不能转换，能的话就用 `type` 作为最终 `dataType`。
-6. 保存第一个 `type`。
-7. 用最终 `dataType` 或者用第一个 `type`。
-8. 如果有最终 `dataType`，并且不是 `dataTypes[0]`，将其推入 `dataTypes`。
-9. 返回 `responses[finalDataType]`。
+1. 检测是否为 `jsonp` 请求，需满足以下要求：
+ 1. 指定了回调函数名 `s.jsonp`。
+ 2. 数据类型为 `json`，并且未禁止 `jsonp` 请求，选项 `url`、`data` 中有触发 `jsonp` 的特征字符 `=?&`、`=?`、`=??`。
+ 3. `Content-Type` 不以 `application/x-www-form-urlencoded` 开头。
+2. 如果第一步的判断满足 `jsonp` 的要求或 `dataTypes[0]` 为 `jsonp` 那么进行处理。
+3. 获取回调函数名。
+4. 把回调函数参数和回调函数名插入 `url` 或 `data`。
+5. 添加 `script json` 转换器，通过闭包机制访问 `responseContainer`，，将响应数据返回给 `jQuery.ajax`。
+6. 强制 `dataTypes[0]` 为 `json`。
+7. 在 `window` 上设置一个同名的回调函数，响应完成以后会被自动调用，并将响应结果设置到 `responseContainer`。
+8. 调用 `jQuery.always` 添加一个回调函数，用来注销并恢复 `window` 上的同名回调函数，在请求成功或失败时都会被调用。
+9. 返回 `script`，将请求的而数据类型重定向为 `script`。
 
-###### `ajaxConvert`
+###### `script`
+
+1. 如果 `cache` 为 `undefined` 则修正为 `false`
+2. 如果跨域了，设置请求方法为 `GET`，`global` 为 `false`。
+
+### 内置请求发送器
+
+###### `script`
+
+如果请求跨域了，那么将利用 `script` 的跨域机制来发送请求。
+
+1. 创建 `script` 标签。
+2. 设置 `src`、`async`、`charset`。
+3. 绑定 `onload`、`onreadystatechange` 事件。
+4. 插入头部。
+5. 如果中途取消或请求成功，那么要清除事件和元素。如果是请求成功还要执行成功的回调。回调就是下文会介绍的 `done`。
+
+###### `*`
+
+1. 如果不是跨域，或者浏览器支持 `cors` 那么执行下面的。
+2. 获取 `XMLHttpRequest` 或 `ActiveXObject`。针对 IE 如果是本地请求，那么会优先使用 `ActiveXObject`，不支持 `ActiveXObject` 才会用 `XMLHttpRequest`。其他情况，只要是支持 `XMLHttpRequest`，则优先使用。
+3. 如果配置了 `s.username`，那么 `open` 时传入 `username/password`。否则只传入 `type`、`url`、`async` 三个选项。
+4. 将 `s.xhrFields` 中的选项设置给原生的 `XMLHttpRequest` 对象。
+5. 如果之前设置了 `mimeType`，那么调用原生 `XMLHttpRequest` 对象的 `overrideMimeType` 进行真正的覆盖。
+6. 对于非跨域请求以及没有设置 `X-Requested-With` 头的情况，设置为 `XMLHttpRequest`。
+7. 设置原生 `XMLHttpRequest` 对象的请求头。
+8. 该设置的都设置了，接下来调用 `send(s.hasContent && s.data ) || null)` 发送请求。
+9. 定义监听函数。
+ 1. 如果没有调用过并且是终止或成功。
+ 2. 设置回调函数 `undefined` 表示调用过了。
+ 3. 移除事件句柄，对于 IE 还要将其从 `xhrCallbacks` 中移除，这个里面保存了等待中的回调，需要在 `unload` 时手动清除。
+ 4. 如果是终止时调用回调，那么调用原生的 `xhr.abort()` 来进行终止。
+ 5. 读取状态码、响应头字符串、响应体及状态文本并进行修正。
+ 6. 执行回调，如果 FireFox 抛出的异常，执行时传入 `-1`。其它情况传入正常的参数。
+10. 如果是同步的请求，直接执行回调。
+11. IE 6、7 缓存的情况，直接 `xhr.readyState === 4`，那么 `setTimeout( callback );`。
+12. 最后的情况就是将 `callback` 设置到 `onreadystatechange` 上。
 
 ### 核心方法
 
@@ -270,6 +311,33 @@ serialize: function() {
 17. 否则，修改 `jqXHR.readyState=1`，触发全局事件 `ajaxSend`，设置定时器，调用 `transport.send( requestHeaders, done );` 发送请求。
 18. 返回 `jqHXR` 对象。
 
+### 数据转换器
+
+###### 内置的数据转换器集
+
+- `"* text": String` 
+- `"text html": true`
+- `"text json": jQuery.parseJSON`
+- `"text xml": jQuery.parseXML`
+- `"text script": jQuery.globalEval( text );`
+- `"script json"`
+
+###### `ajaxHandleResponses`
+
+1. 删除掉通配 `dataType`，得到之前覆盖的的 `Content-Type` 或返回的 `Content-Type`。
+2. 检查是否能处理，能处理并且匹配上一步求出的 `Content-Type` 那么将其推入 `dataTypes`。
+3. 如果 `dataTypes` 是我们想要的，也就是 text、xml、json。那么就确定是它了。
+4. 尝试转换成我们要的 `dataType`，如果 `dataTypes[0]` 不存在，则直接用 `type` 作为最终 `dataType`。
+5. 否则，看看能不能转换，能的话就用 `type` 作为最终 `dataType`。
+6. 保存第一个 `type`。
+7. 用最终 `dataType` 或者用第一个 `type`。
+8. 如果有最终 `dataType`，并且不是 `dataTypes[0]`，将其推入 `dataTypes`。
+9. 返回 `responses[finalDataType]`。
+
+###### `ajaxConvert`
+
+根据返回的 `response` 中的类型和 `dataTypes`，选择数据转换函数进行数据转换。具体过程挺复杂，不看了。
+
 ###### 回调函数。
  
 1. 如果 `state` 已经为 2，直接返回。 
@@ -277,4 +345,53 @@ serialize: function() {
 3. 清空定时器、缓存的响应头字符串、请求发送器。
 4. `readyState` 改为 4，根据状态得到 `isSuccess`。
 5. 读取响应数据 `ajaxHandleResponses`。
-6. 数据类型转换 `ajaxConvert`
+6. 数据类型转换 `ajaxConvert`。
+7. 如果请求成功。
+ 1. 如果开启了 `ifModified` 并更新了，那么缓存 `Last-Modified`、`etag`。
+ 2. 如果状态码是 204，且请求方法是 `HEAD`，那么设置状态文本为 `nocontent`。
+ 3. 状态码是 304，那么设置状态文本为 `notmodified`。
+ 4. 从 `response` 中获取并设置。
+8. 否则请求失败，设置 `error`、`statusText`。
+9. 设置 `jqXHR` 的 `status`、`statusText`。
+10. 根据成功与否，执行对象的回调。
+11. 执行状态码相关的回调。
+12. 触发全局事件 `ajaxSuccess` 或 `ajaxError`。
+13. 调用完成的回调。
+14. 触发全局事件 `ajaxComplete` 和 `ajaxStop`。
+
+### 便捷方法
+
+###### `get`、`post`
+
+```
+jQuery.each( [ "get", "post" ], function( i, method ) {
+	jQuery[ method ] = function( url, data, callback, type ) {
+		// shift arguments if data argument was omitted
+		if ( jQuery.isFunction( data ) ) {
+			type = type || callback;
+			callback = data;
+			data = undefined;
+		}
+
+		return jQuery.ajax({
+			url: url,
+			type: method,
+			dataType: type,
+			data: data,
+			success: callback
+		});
+	};
+});
+```
+
+###### `getJSON`、`getScript`
+
+```
+getJSON: function( url, data, callback ) {
+	return jQuery.get( url, data, callback, "json" );
+},
+
+getScript: function( url, callback ) {
+	return jQuery.get( url, undefined, callback, "script" );
+}
+```
