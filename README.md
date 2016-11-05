@@ -24,3 +24,4 @@
    6. [样式操作](./lib/样式操作.md)
    7. [异步请求 Ajax](./lib/异步请求 Ajax.md)
    8. 动画 Effects
+5. [行业专家聊：jQuery还有意义吗？](./lib/jQuery还有意义吗.md)
